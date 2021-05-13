@@ -54,6 +54,25 @@ def krw_LET (Lw, Ew, Tw, Swn):
     return krw_fit
 #-------------------------------
 
+# --- Beginning of Matplotlib helper code ---
+
+def draw_figure(canvas, figure):
+    figure_canvas_agg = FigureCanvasTkAgg(figure, canvas)
+    figure_canvas_agg.draw()
+    figure_canvas_agg.get_tk_widget().pack(side='top', fill='both', expand=1)
+    return figure_canvas_agg
+
+#--- Clears or plots a specific curve ---
+
+def plot_action (figure, fig_, axis, curvex, curvey, switch, color):
+    figure.get_tk_widget().forget()
+    if switch == True:
+        axis.scatter (curvex, curvey,c=color)
+    else:
+        axis.clear()
+    figure = draw_figure(window['-CANVAS-'].TKCanvas, fig_)
+    return   figure
+#-------------------------------------------
 
 #--- TEST DATA ---
 Swi=44
@@ -66,7 +85,7 @@ degree=2
 
 
 #--- Import Data Table ---
-data = pd.read_csv(r'\\INLAB-AR-DC02\Gerencia\Python\MV.a-37-1-8-148.csv',index_col=0)
+data = pd.read_csv(r'C:\Users\jbardelli\Documents\Python\Jones Roszelle\Sample_MV.a-37-1-8-148.csv',index_col=0)
 print("\nRAW EXPERIMENTAL DATA\n",data)
 
 # BTpoint=0
