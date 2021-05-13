@@ -221,24 +221,24 @@ def calc_kr ():
     return
 #-------------------------------
 
-# --- GUI FUNCTIONS ---
+# # --- GUI FUNCTIONS ---
 
-def draw_figure(canvas, figure):
-    figure_canvas_agg = FigureCanvasTkAgg(figure, canvas)
-    figure_canvas_agg.draw()
-    figure_canvas_agg.get_tk_widget().pack(side='top', fill='both', expand=1)
-    return figure_canvas_agg
+# def draw_figure(canvas, figure):
+#     figure_canvas_agg = FigureCanvasTkAgg(figure, canvas)
+#     figure_canvas_agg.draw()
+#     figure_canvas_agg.get_tk_widget().pack(side='top', fill='both', expand=1)
+#     return figure_canvas_agg
 
-#--- Clears or plots a specific curve ---
+# #--- Clears or plots a specific curve ---
 
-def plot_action (figure, fig_, axis, curvex, curvey, switch, color):
-    figure.get_tk_widget().forget()
-    if switch == True:
-        axis.scatter (curvex, curvey,c=color)
-    else:
-        axis.clear()
-    figure = draw_figure(window['-CANVAS-'].TKCanvas, fig_)
-    return   figure
+# def plot_action (figure, fig_, axis, curvex, curvey, switch, color):
+#     figure.get_tk_widget().forget()
+#     if switch == True:
+#         axis.scatter (curvex, curvey,c=color)
+#     else:
+#         axis.clear()
+#     figure = draw_figure(window['-CANVAS-'].TKCanvas, fig_)
+#     return   figure
 
 #-------------------------------------------
 
@@ -252,61 +252,64 @@ q=18
 degree=2
 Qi = Np = deltaP = Swn = kro = krw = krw_Sor = 0
 
-# ------------------------------- Beginning of GUI CODE -------------------------------
 
-# Define plot
-plt.ioff()  
-plt.figure()
-fig=plt.gcf()
-fig, ax1 = plt.subplots()
-ax1.set_xlabel('Qi')
-ax1.set_ylabel('Np [cm3]')
-ax2 = ax1.twinx()
-ax2.set_ylabel('deltaP [psi]')
+file = r'C:\Users\jbardelli\Documents\Python\Jones Roszelle\Sampple_MV.a-37-1-17-84.csv'
+calc_kr()
+# # ------------------------------- Beginning of GUI CODE -------------------------------
 
-# define the window layouts
-layout_main = [[sg.Text('Plot test')],
-              [sg.Canvas(key='-CANVAS-')],
-              [sg.Checkbox('NP', key="-NP-"),sg.Checkbox('DP', key="-DP-")],
-              [sg.Button('Settings'),sg.Button('Clear'),sg.Button('Update'),sg.Button('Cancel'),sg.Button('Calculate')]]
+# # Define plot
+# plt.ioff()  
+# plt.figure()
+# fig=plt.gcf()
+# fig, ax1 = plt.subplots()
+# ax1.set_xlabel('Qi')
+# ax1.set_ylabel('Np [cm3]')
+# ax2 = ax1.twinx()
+# ax2.set_ylabel('deltaP [psi]')
+
+# # define the window layouts
+# layout_main = [[sg.Text('Plot test')],
+#               [sg.Canvas(key='-CANVAS-')],
+#               [sg.Checkbox('NP', key="-NP-"),sg.Checkbox('DP', key="-DP-")],
+#               [sg.Button('Settings'),sg.Button('Clear'),sg.Button('Update'),sg.Button('Cancel'),sg.Button('Calculate')]]
 
 
-# create the form and show it without the plot
-window = sg.Window('Jones-Roszelle', layout_main, finalize=True, element_justification='center', font='Helvetica 18')
+# # create the form and show it without the plot
+# window = sg.Window('Jones-Roszelle', layout_main, finalize=True, element_justification='center', font='Helvetica 18')
 
-# add the plot to the window
-fig_canvas_agg = draw_figure(window['-CANVAS-'].TKCanvas, fig)
+# # add the plot to the window
+# fig_canvas_agg = draw_figure(window['-CANVAS-'].TKCanvas, fig)
 
-while(True):
-    event, values = window.read()
-    print(values)
+# while(True):
+#     event, values = window.read()
+#     print(values)
      
-    if event == "Cancel" or event == sg.WIN_CLOSED:
-        break
-    if event == "Settings":
-        #--- Open Settings Window ---
-        layout_settings = [[sg.Text('Select File:'),sg.FileBrowse()],
-                  [sg.Button('Done')]]
-        window_set = sg.Window('Test Settings', layout_settings, finalize=True, element_justification='center', font='Helvetica 18')
-        while(True):
-            event_set, values_set = window_set.read()
-            if event_set == "Done" or event == sg.WINDOW_CLOSED:
-                print(values_set)
-                file = values_set['Browse']
-                window_set.close()
-                break
-    if event == "Calculate":
-        calc_kr()
-    if values["-NP-"] == True:
-        fig_canvas_agg = plot_action(fig_canvas_agg, fig, ax1, Qi, Np, True, 'b')
-    if values["-NP-"] == False:
-        fig_canvas_agg = plot_action(fig_canvas_agg, fig, ax1, Qi, Np, False, 'b')
-    if values["-DP-"] == True:
-        fig_canvas_agg = plot_action(fig_canvas_agg, fig, ax2, Qi, deltaP, True, 'r')
-    if values["-DP-"] == False:
-        fig_canvas_agg = plot_action(fig_canvas_agg, fig, ax2, Qi, deltaP, False, 'r')
+#     if event == "Cancel" or event == sg.WIN_CLOSED:
+#         break
+#     if event == "Settings":
+#         #--- Open Settings Window ---
+#         layout_settings = [[sg.Text('Select File:'),sg.FileBrowse()],
+#                   [sg.Button('Done')]]
+#         window_set = sg.Window('Test Settings', layout_settings, finalize=True, element_justification='center', font='Helvetica 18')
+#         while(True):
+#             event_set, values_set = window_set.read()
+#             if event_set == "Done" or event == sg.WINDOW_CLOSED:
+#                 print(values_set)
+#                 file = values_set['Browse']
+#                 window_set.close()
+#                 break
+#     if event == "Calculate":
+#         calc_kr()
+#     if values["-NP-"] == True:
+#         fig_canvas_agg = plot_action(fig_canvas_agg, fig, ax1, Qi, Np, True, 'b')
+#     if values["-NP-"] == False:
+#         fig_canvas_agg = plot_action(fig_canvas_agg, fig, ax1, Qi, Np, False, 'b')
+#     if values["-DP-"] == True:
+#         fig_canvas_agg = plot_action(fig_canvas_agg, fig, ax2, Qi, deltaP, True, 'r')
+#     if values["-DP-"] == False:
+#         fig_canvas_agg = plot_action(fig_canvas_agg, fig, ax2, Qi, deltaP, False, 'r')
 
-window.close()
+# window.close()
 
 
 
