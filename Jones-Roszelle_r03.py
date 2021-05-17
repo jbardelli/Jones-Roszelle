@@ -41,7 +41,7 @@ def settings_window ():
 
 #--- PLOT FUNCTIONS ---
 
-def plot_np (figure, fig_, axis, Qi, Avg_Sw, Swm, switch):
+def plot_np (figure, fig_, axis, Qi, Avg_Sw, Swm, switch):                      # Plot the average sw with calculated sw
     figure.get_tk_widget().forget()
     if switch == True:
         axis.set_xlabel('Qi')
