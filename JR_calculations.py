@@ -180,7 +180,7 @@ def calc_kr (Vp, Swi, q, L, D, uw, uo, ko_Swi, degree, file):
     df_let['krw'] = df_let['krw'].map("{:,.3f}".format).astype(float)
     print(df_let) 
   
-    result = (Qi, Avg_Sw, Swm_calc, lambda2, kro, krw, kro_fit, krw_fit, Sw2, Sor, Swf, kro[0], krw_Sor)
+    result = (Qi, Avg_Sw, Swm_calc, lambda2, kro, krw, kro_fit, krw_fit, Sw2, Sor, Swf, kro[0], krw_Sor, fw)
     
     return result
 
