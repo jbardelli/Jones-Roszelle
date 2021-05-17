@@ -57,7 +57,7 @@ def plot_np (figure, fig_, axis, Qi, Avg_Sw, Swm, switch):                      
     figure = draw_figure(window['-NP-'].TKCanvas, fig_)
     return   figure
 
-def plot_dp (figure, fig_, axis, Qi, lambda2, switch):
+def plot_dp (figure, fig_, axis, Qi, lambda2, switch):                          # Plot lambda2 calculated based on deltaP
     figure.get_tk_widget().forget()
     if switch == True:
         axis.set_xlabel('Qi')
