@@ -12,6 +12,28 @@ import pandas as pd
 from scipy import interpolate
 from scipy.optimize import minimize
 
+def get_data_table (file):
+    data = pd.read_csv(file, index_col=0)    # Import Data Table
+    print("\nRAW EXPERIMENTAL DATA\n",data)
+    
+    # BTpoint=0
+    # data=data.drop(data.index[[range(0,BTpoint)]])
+    #print("\nTabla de datos a partir del BT\n",data)
+    
+    Widf = data['Wi (ml)']              #Get the panda data frames from the file
+    Npdf = data['Np (ml)']
+    deltaPdf = data ['deltaP (psi)']
+    
+    Wi=Widf.to_numpy()                  #Convert panda DataFrame to numpy array for calculations
+    Np=Npdf.to_numpy()
+    deltaP=deltaPdf.to_numpy()
+               
+    Wi=np.delete (Wi,[0,1])             #Delete first position to avoid NaN error in optimization functions
+    Np=np.delete (Np,[0,1])
+    deltaP=np.delete(deltaP,[0,1])
+    result = (Wi, Np, deltaP)
+    return result
+
 def differ_sw (x, Swi, Np, Vp, Qi, degree):
     a, b = x
     Avg_Sw=(Swi/100+Np/Vp)*100          # Calculate average water saturation
@@ -50,26 +72,7 @@ def krw_LET (Lw, Ew, Tw, Swn, krw_Sor):
     krw_fit=(krw_Sor*(Swn**Lw))/((Swn**Lw)+Ew*((1-Swn)**Tw))
     return krw_fit
 
-def calc_kr (Vp, Swi, q, L, D, uw, uo, ko_Swi, degree, file):
-    
-    data = pd.read_csv(file, index_col=0)    # Import Data Table
-    print("\nRAW EXPERIMENTAL DATA\n",data)
-    
-    # BTpoint=0
-    # data=data.drop(data.index[[range(0,BTpoint)]])
-    #print("\nTabla de datos a partir del BT\n",data)
-    
-    Widf = data['Wi (ml)']              #Get the panda data frames from the file
-    Npdf = data['Np (ml)']
-    deltaPdf = data ['deltaP (psi)']
-    
-    Wi=Widf.to_numpy()                  #Convert panda DataFrame to numpy array for calculations
-    Np=Npdf.to_numpy()
-    deltaP=deltaPdf.to_numpy()
-    
-    Wi=np.delete (Wi,[0,1])             #Delete first position to avoid NaN error in optimization functions
-    Np=np.delete (Np,[0,1])
-    deltaP=np.delete(deltaP,[0,1])
+def calc_kr (Vp, Swi, q, L, D, uw, uo, ko_Swi, degree, Wi, Np, deltaP):
     
     Qi=Wi/Vp                            #Calculate pore volumes injected
     dpb_qb = uw*(L/(m.pi*D**2/4))*(1/ko_Swi)*14.69/3600*1000    #Calculate deltapb/qb (see Jones paper)
