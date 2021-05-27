@@ -31,19 +31,28 @@ def settings_window (file, L, D, Vp, Swi, uo, uw, q, ko_Swi, degree):
                    [sg.Button('Done')]]
     return sg.Window('Test Settings', layout_settings, finalize=True, element_justification='left', font=("Arial", 10))
 
-def table_window (Wi, Np, deltaP):
-    data = np.column_stack((Wi,Np, deltaP))
+def table_window (Wi, Np, deltaP, fig_ex, degree):
     MAX_ROWS = 20
     MAX_COL = 3
     
-    columm_layout =  [[sg.Text(str(i), size=(4, 1), justification='right')] + [sg.InputText(size=(11, 1), pad=(1,1),border_width=0, justification='right', key=(i, j)) for j in range(MAX_COL)] for i in range(MAX_ROWS)]
+    columm_layout =  [[sg.Text(str(i), size=(4, 1), justification='right')] + [sg.Input(size=(11, 1), pad=(1,1),border_width=0, justification='right', enable_events=True, key=(i, j)) for j in range(MAX_COL)] for i in range(MAX_ROWS)]
     
     layout_table = [[sg.Text(' ',size=(4,1)),sg.Text('Wi [ml]',size=(9,1)), sg.Text('Np [ml]',size=(9,1)), sg.Text('deltaP [psi]',size=(9,1))],
-                    [sg.Col(columm_layout, scrollable=False,)],
-                    [sg.Button('Done')]]
+                    [sg.Col(columm_layout, scrollable=False,)]]
+ 
+    layout_plot = [[sg.Canvas(key='-EX-')],
+                   [sg.Button('Use Table'),sg.Button('Use Fit'),sg.Button('Read from File'),sg.Text('Spline degree'),sg.Combo(['1','2','3','4'],default_value=str(degree), key='-DEG-', enable_events=True)]]
+   
+    layout = [[sg.Frame('Table', layout_table), sg.Frame('Plot', layout_plot)]]    
+        
+    window = sg.Window('Experimental Data',layout, finalize=True, element_justification='left', font=("Arial", 10))
+    fig_canvas_agg_ex = draw_figure(window['-EX-'].TKCanvas, fig_ex)
+    populate_table (window, Wi, Np, deltaP)
     
-    window = sg.Window('Experimental Data',layout_table, finalize=True, element_justification='left', font=("Arial", 10))
-    
+    return window, fig_canvas_agg_ex
+
+def populate_table (window, Wi, Np, deltaP):    #Populates the table with data expressed as np.array
+    data = np.column_stack((Wi ,Np, deltaP))
     for i, row in enumerate(data):
         for j, item in enumerate(row):
             location = (i, j)
@@ -54,10 +63,9 @@ def table_window (Wi, Np, deltaP):
                     target_element.update(new_value)
             except:
                 pass
-    
-    return window
+    return
 
-def extract_values(table, Wi, Np, deltaP):
+def extract_values(table, Wi, Np, deltaP):              #Gets the values from the table and forms arrays
     data = np.column_stack((Wi,Np, deltaP))
     for i, row in enumerate(data):
         for j, item in enumerate(row):
@@ -66,3 +74,34 @@ def extract_values(table, Wi, Np, deltaP):
         Np=data[:,1]
         deltaP=data[:,2]
     return Wi, Np, deltaP
+
+def input_error (message):
+    layout = [[sg.Text(message)],
+              [sg.Button('OK')]]
+    window = sg.Window('ERROR',layout, finalize=False, element_justification='center', font=("Arial", 10))
+    return window
+
+def calc_input_validation (Vp, Swi, q, L, D, uw, uo, ko_Swi, degree, Wi, Np, deltaP):
+    if Vp == 0 or Swi == 0 or q == 0 or L == 0 or D == 0 or uo == 0 or uw == 0 or ko_Swi == 0 or degree == 0 or np.all(Np==0) or np.all(Wi==0) or np.all(deltaP==0):
+        window = input_error ('One or more values are zero \nCheck Settings')
+        while True:
+            event, values = window.read()
+            if event == 'OK':
+                window.close()
+                break
+        return False
+    else:
+        return True
+
+def table_input_validation (Wi, Np, deltaP):
+    if np.all(Np==0) and np.all(Wi==0) and np.all(deltaP==0):
+        window = input_error ('All arrays are zero \nCheck Settings')
+        while True:
+            event, values = window.read()
+            if event == 'OK':
+                window.close()
+                break
+        return False
+    else:
+        return True
+  

@@ -5,28 +5,32 @@ Created on Sun Apr 23 20:35:54 2017
 """
 
 import pandas as pd
-#import numpy as np
+import numpy as np
 import matplotlib.pyplot as plt
+from scipy.interpolate import UnivariateSpline
 import PySimpleGUI as sg
 #from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import JR_calculations as jr # Custom module with the calculations for Jones-Roszelle method
 import JR_gui as gui         # Custom module for windows layouts and functions
 import JR_plots as plots     # Custom module for varios types of predefined plots used in the main window
+from os import path
 
 #---------------------------------
 #--- TEST DATA Variables ---
-Swi=Vp=uw=uo=L=D=ko_Swi=q=data=0.0
+Wi=Np=deltaP=Swi=Vp=uw=uo=L=D=ko_Swi=q=data=0.0
 degree=2
 file = " "
 
 # # --- Beginning of GUI CODE ---
-# Define plot
+# Define plots
 plt.ioff()  
-fig_kr,ax1 = plt.subplots()
-fig_fw,ax2 = plt.subplots()
-fig_np,ax3 = plt.subplots()
-fig_dp,ax4 = plt.subplots() 
-
+fig_kr, ax1 = plt.subplots()
+fig_fw, ax2 = plt.subplots()
+fig_np, ax3 = plt.subplots()
+fig_dp, ax4 = plt.subplots() 
+fig_ex, bx1 = plt.subplots()
+bx2 = bx1.twinx()
+   
 # define the main window layout
 layout_main = [[sg.Text('Jones-Roszelle Relative Permeability')],
               [sg.Canvas(key='-NP-'),sg.Canvas(key='-KR-')],
@@ -36,11 +40,12 @@ layout_main = [[sg.Text('Jones-Roszelle Relative Permeability')],
 # create the form and show it without the plot
 window = sg.Window('Jones-Roszelle', layout_main, finalize=True, element_justification='center', font=("Arial", 10), location=(0,0))
 
-# add the plots to the window
+# add the plots to the windows
 fig_canvas_agg_np = gui.draw_figure(window['-NP-'].TKCanvas, fig_np)
 fig_canvas_agg_dp = gui.draw_figure(window['-DP-'].TKCanvas, fig_dp)
 fig_canvas_agg_kr = gui.draw_figure(window['-KR-'].TKCanvas, fig_kr)
 fig_canvas_agg_fw = gui.draw_figure(window['-FW-'].TKCanvas, fig_fw)
+fit_degree = 2
 
 while(True):
     event, values = window.read()
@@ -66,7 +71,7 @@ while(True):
                 q = float(values_set['-RATE-'])
                 ko_Swi = float(values_set['-KOSWI-'])
                 degree = int(values_set['-DEGREE-'])
-                Wi, Np, deltaP = Wio, Npo, dPo = jr.get_data_table (file)   
+                if path.isfile(file): Wi, Np, deltaP = Wio, Npo, dPo = jr.get_data_table (file)
                 window_set.close()
                 break
             if event_set == sg.WIN_CLOSED:                              # If window was closed do nothing, ignore entries
@@ -76,21 +81,35 @@ while(True):
                 window_set['-FILE-'].update(values_set['Browse'])       # Update the box with the browsed file name
     
     if event == "Table":
-        window_table = gui.table_window (Wi, Np, deltaP)
-        while (True):
-            event_table, values_table = window_table.read()
-            if event_table == "Done" or event_table == sg.WIN_CLOSED:
-                Wi, Np, deltaP = gui.extract_values(values_table, Wi, Np, deltaP)
-                window_table.close()
-                break
-    
+        if gui.table_input_validation (Wi, Np, deltaP):
+            window_table, fig_canvas_agg_ex = gui.table_window (Wi, Np, deltaP, fig_ex, fit_degree)
+            while (True):
+                fig_canvas_agg_ex, fit_np, fit_dp = plots.plot_exp (window_table, fig_canvas_agg_ex, fig_ex, bx1, bx2, Wi, Np, deltaP, fit_degree)
+                event_table, values_table = window_table.read()            
+                if event_table == "Use Table" or event_table == sg.WIN_CLOSED:
+                    window_table.close()
+                    break
+                else: 
+                    fit_degree = int(values_table['-DEG-'])
+                    Wi, Np, deltaP = gui.extract_values(values_table, Wi, Np, deltaP)  
+                if event_table == "Use Fit":
+                    Np = np.round_(fit_np, 2)
+                    deltaP = np.round_(fit_dp, 2)
+                    window_table.close()
+                    break
+                if event_table == "Read from File":
+                    Wi, Np, deltaP = Wio, Npo, dPo = jr.get_data_table (file)
+                    gui.populate_table (window_table, Wi, Np, deltaP)
+            
     if event == "Calculate":
-        results=jr.calc_kr(Vp, Swi, q, L, D, uw, uo, ko_Swi, degree, Wi, Np, deltaP)  # Calculate Kr curves
-        Qi, Avg_Sw, Swm_calc, lambda2, kro, krw, kro_fit, krw_fit, Sw2, Sor, Swf, kro_Swi, krw_Sor, fw = results
-        fig_canvas_agg_kr = plots.plot_kr(window, fig_canvas_agg_kr, fig_kr, ax1, Sw2, kro_fit, krw_fit, Swi, Swf, True)      #Plot Kr curves
-        fig_canvas_agg_fw = plots.plot_fw(window, fig_canvas_agg_fw, fig_fw, ax2, Sw2, fw, Swi, Swf, True)                    #Plot fw curve
-        fig_canvas_agg_np = plots.plot_np(window, fig_canvas_agg_np, fig_np, ax3, Qi, Avg_Sw, Swm_calc, True)                 #Plot fw curve
-        fig_canvas_agg_dp = plots.plot_dp(window, fig_canvas_agg_dp, fig_dp, ax4, Qi, lambda2, True)                          #Plot lambda2 curve 
+        if gui.calc_input_validation (Vp, Swi, q, L, D, uw, uo, ko_Swi, degree, Wi, Np, deltaP):
+            results=jr.calc_kr(Vp, Swi, q, L, D, uw, uo, ko_Swi, degree, Wi, Np, deltaP)  # Calculate Kr curves
+            Qi, Avg_Sw, Swm_calc, lambda2, kro, krw, kro_fit, krw_fit, Sw2, Sor, Swf, kro_Swi, krw_Sor, fw = results
+            fig_canvas_agg_kr = plots.plot_kr(window, fig_canvas_agg_kr, fig_kr, ax1, Sw2, kro_fit, krw_fit, Swi, Swf, True)      #Plot Kr curves
+            fig_canvas_agg_fw = plots.plot_fw(window, fig_canvas_agg_fw, fig_fw, ax2, Sw2, fw, Swi, Swf, True)                    #Plot fw curve
+            fig_canvas_agg_np = plots.plot_np(window, fig_canvas_agg_np, fig_np, ax3, Qi, Avg_Sw, Swm_calc, True)                 #Plot fw curve
+            fig_canvas_agg_dp = plots.plot_dp(window, fig_canvas_agg_dp, fig_dp, ax4, Qi, lambda2, True)                          #Plot lambda2 curve  
+            
     if event == "Clear":
         fig_canvas_agg_kr = plots.plot_kr(window, fig_canvas_agg_kr, fig_kr, ax1, Sw2, kro_fit, krw_fit, Swi, Swf, False)     #Clear all plots
         fig_canvas_agg_fw = plots.plot_fw(window, fig_canvas_agg_fw, fig_fw, ax2, Sw2, fw, Swi, Swf, False)                   #Clear all plots
