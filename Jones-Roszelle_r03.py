@@ -4,22 +4,22 @@ Created on Sun Apr 23 20:35:54 2017
 @author: jbardelli
 """
 
-import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.interpolate import UnivariateSpline
 import PySimpleGUI as sg
-#from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import JR_calculations as jr # Custom module with the calculations for Jones-Roszelle method
 import JR_gui as gui         # Custom module for windows layouts and functions
 import JR_plots as plots     # Custom module for varios types of predefined plots used in the main window
+import JR_save as jrsave     # Custom module for saving results to Excel file
 from os import path
 
 #---------------------------------
 #--- TEST DATA Variables ---
 Wi=Np=deltaP=Swi=Vp=uw=uo=L=D=ko_Swi=q=data=0.0
-degree=2
-file = " "
+degree = 2
+data_file       = ""
+report_folder   = ""
+report_file     = ""
 
 # # --- Beginning of GUI CODE ---
 # Define plots
@@ -35,7 +35,7 @@ bx2 = bx1.twinx()
 layout_main = [[sg.Text('Jones-Roszelle Relative Permeability')],
               [sg.Canvas(key='-NP-'),sg.Canvas(key='-KR-')],
               [sg.Canvas(key='-DP-'),sg.Canvas(key='-FW-')],
-              [sg.Button('Settings'),sg.Button('Clear'),sg.Button('Close'),sg.Button('Table'),sg.Button('Calculate')]]
+              [sg.Button('Settings'),sg.Button('Table'),sg.Button('Clear'),sg.Button('Close'),sg.Button('Calculate'),sg.Button('Save Results')]]
 
 # create the form and show it without the plot
 window = sg.Window('Jones-Roszelle', layout_main, finalize=True, element_justification='center', font=("Arial", 10), location=(0,0))
@@ -56,12 +56,12 @@ while(True):
     
     if event == "Settings":
         #--- Open Settings Window ---
-        window_set = gui.settings_window(file, L, D, Vp, Swi, uo, uw, q, ko_Swi, degree)     
+        window_set = gui.settings_window(data_file, L, D, Vp, Swi, uo, uw, q, ko_Swi, degree)     
         while(True):                                                # Wait for events
             event_set, values_set = window_set.read()
             if event_set == "Done":                                 #If Done was pressed update all the variables
                 print(values_set)
-                file = values_set['-FILE-']
+                data_file = values_set['-FILE-']
                 L = float(values_set['-L-'])
                 D = float(values_set['-D-'])
                 Vp = float(values_set['-PV-'])
@@ -71,7 +71,7 @@ while(True):
                 q = float(values_set['-RATE-'])
                 ko_Swi = float(values_set['-KOSWI-'])
                 degree = int(values_set['-DEGREE-'])
-                if path.isfile(file): Wi, Np, deltaP = Wio, Npo, dPo = jr.get_data_table (file)
+                if path.isfile(data_file): Wi, Np, deltaP = Wio, Npo, dPo = jr.get_data_table (data_file)
                 window_set.close()
                 break
             if event_set == sg.WIN_CLOSED:                              # If window was closed do nothing, ignore entries
@@ -98,7 +98,7 @@ while(True):
                     window_table.close()
                     break
                 if event_table == "Read from File":
-                    Wi, Np, deltaP = Wio, Npo, dPo = jr.get_data_table (file)
+                    Wi, Np, deltaP = Wio, Npo, dPo = jr.get_data_table (data_file)
                     gui.populate_table (window_table, Wi, Np, deltaP)
             
     if event == "Calculate":
@@ -115,42 +115,25 @@ while(True):
         fig_canvas_agg_fw = plots.plot_fw(window, fig_canvas_agg_fw, fig_fw, ax2, Sw2, fw, Swi, Swf, False)                   #Clear all plots
         fig_canvas_agg_np = plots.plot_np(window, fig_canvas_agg_np, fig_np, ax3, Qi, Avg_Sw, Swm_calc, False)                #Clear all plots
         fig_canvas_agg_dp = plots.plot_dp(window, fig_canvas_agg_dp, fig_dp, ax4, Qi, lambda2, False)                         #Clear all plots
-
+    
+    if event == "Save Results":
+        window_save = gui.save_window(report_file, report_folder)
+        while True:
+            event_save, values_save = window_save.read()
+            if event_save == "Cancel" or event_save == sg.WIN_CLOSED:
+                window_save.close()
+                break
+            if event_save == "Save":               
+                Wiexp, Npexp, deltaPexp = Wio, Npo, dPo = jr.get_data_table (data_file)
+                report_folder = values_save['-FOLDER-']
+                report_file = values_save['-FILE-']
+                report_path = report_folder + '/' + report_file + '.xls'
+                if gui.file_exists_check(report_path):
+                    print('Saving to ', report_path)
+                    jrsave.save_to_file(report_path, Swi, L, D, Vp, uo, uw, q, ko_Swi, Sor, Swf, krw_Sor, Wi, Np, deltaP, Sw2, kro, krw, Wiexp, Npexp, deltaPexp, degree)     
+                    window_save.close()
+                    break
+                else:
+                    print('File exists or already open...')
 window.close()
 
-# #--- WRITE TO EXCEL FILE ---
-# writer = pd.ExcelWriter("test_KR.xlsx",engine="xlsxwriter" )
-# workbook = writer.book
-# worksheet = workbook.add_worksheet('KR')
-# writer.sheets['KR'] = worksheet
-# sat_format = workbook.add_format()
-# sat_format.set_num_format('0.0')
-# kr_format = workbook.add_format()
-# kr_format.set_num_format('0.000')
-# worksheet.write('A1','--TEST DATA--')
-# worksheet.write('A2','Swi[%]')
-# worksheet.write('B2', Swi, sat_format)
-# worksheet.write('A3','VP[cm3]')
-# worksheet.write('B3',Vp)
-# worksheet.write('A4','uo[cP]')
-# worksheet.write('B4',uo)
-# worksheet.write('A4','uw[cP]')
-# worksheet.write('B4',uw)
-# worksheet.write('A4','q[cm3/h]')
-# worksheet.write('B4',q)
-# worksheet.write('A5','--RESULTS--')
-# worksheet.write('A6','Sor[%]')
-# worksheet.write('B6', Sor ,sat_format)
-# worksheet.write('A7','Swf[%]')
-# worksheet.write('B7', Swf, sat_format)
-# worksheet.write('A8','Krw@Sor')
-# worksheet.write('B8', krw_Sor, kr_format)
-
-# df.to_excel(writer, sheet_name='KR', startrow=10, startcol=0)
-
-# worksheet = writer.book.add_worksheet('KR LET')
-# writer.sheets['KR LET'] = worksheet
-# worksheet.write(0,0,"LET RELATIVE PERMEABILITY TABLE")
-# df_let.to_excel(writer, sheet_name='KR LET', startrow=4, startcol=0)
-# writer.save()  
-  

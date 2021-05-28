@@ -7,6 +7,7 @@ Created on Tue May 18 09:32:50 2021
 import PySimpleGUI as sg
 import numpy as np
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from os import path
 
 # # --- GUI FUNCTIONS ---
 
@@ -15,6 +16,12 @@ def draw_figure(canvas, figure):
     figure_canvas_agg.draw()
     figure_canvas_agg.get_tk_widget().pack(side='top', fill='both', expand=1)
     return figure_canvas_agg
+
+def save_window (file, folder):
+    layout_save = [[sg.Text('Destination Folder',size=(13,1)), sg.InputText(folder,size=(40,1),key='-FOLDER-'), sg.FolderBrowse()],
+                   [sg.Text('File Name', size=(13,1)), sg.InputText(file,size=(40,1),key='-FILE-')],
+                   [sg.Button('Save'), sg.Button('Cancel')]]
+    return sg.Window('Save Results', layout_save, finalize=True, element_justification='left', font=("Arial", 10))
 
 def settings_window (file, L, D, Vp, Swi, uo, uw, q, ko_Swi, degree):
     # define the settings window layout
@@ -104,4 +111,36 @@ def table_input_validation (Wi, Np, deltaP):
         return False
     else:
         return True
-  
+
+def file_open_check (file_n): 
+    try:
+        myfile = open (file_n, "r+")
+        myfile.close()
+        return False   
+    except IOError:    
+        window = input_error ('File is already open')
+        event, values = window.read()
+        if event == 'OK':
+            window.close()
+            return True
+
+def file_exists_check (file_n): 
+    layout = [[sg.Text('File already exists, overwrite?')],
+              [sg.Button('YES'), sg.Button('NO')]]
+    
+    if path.isfile(file_n):
+        window = sg.Window('WARNING',layout, finalize=False, element_justification='center', font=("Arial", 10))
+        event, values = window.read()
+        if event == 'YES':
+            if file_open_check(file_n):
+                window.close()
+                return False
+            else: 
+                window.close()
+                return True
+        if event == 'NO': 
+            window.close()
+            return False
+    else:
+        return True
+

@@ -14,8 +14,8 @@ from scipy.optimize import minimize
 
 def get_data_table (file):
     data = pd.read_csv(file, index_col=0)    # Import Data Table
-    print("\nRAW EXPERIMENTAL DATA\n",data)
     
+    # print("\nRAW EXPERIMENTAL DATA\n",data)
     # BTpoint=0
     # data=data.drop(data.index[[range(0,BTpoint)]])
     #print("\nTabla de datos a partir del BT\n",data)
