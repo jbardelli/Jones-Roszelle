@@ -47,7 +47,7 @@ def save_to_file (file, Swi, L, D, Vp, uo, uw, q, ko_Swi, Sor, Swf, krw_Sor, Wi,
     worksheet.write('B14', degree)
     
     worksheet.write('A16','--RELATIVE PERMEABILITY RESULTS TABLE--')
-    df1 = pd.DataFrame(np.transpose([Sw2,kro,krw]), columns=['Sw','kro','krw'])
+    df1 = pd.DataFrame(np.transpose([np.round(Sw2, 2),np.round(kro, 4), np.round(krw, 4)]), columns=['Sw','kro','krw'])
     df1.to_excel(writer, sheet_name='KR', startrow=17, startcol=0)
     
     worksheet.write('A41','--DATA TABLE USED IN CALCULATIONS--')    

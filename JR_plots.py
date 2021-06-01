@@ -6,9 +6,6 @@ Created on Tue May 18 10:10:23 2021
 """
 import numpy as np
 import JR_gui as gui         # Custom module for windows layouts and functions
-from scipy.interpolate import UnivariateSpline
-from scipy.optimize import curve_fit
-import numpy.polynomial.polynomial as poly
 
 #--- PLOT FUNCTIONS ---
 
@@ -83,11 +80,14 @@ def plot_fw (window, figure, fig_, axis, Sw2, fw, Swi, Swf, switch):
     return   figure
 
 
-def plot_exp (window, figure, fig_, axis1, axis2, Wi, Np, deltaP, degree):      # Plot the experimental values of Np
-    spl1 = UnivariateSpline(Wi, Np, k=degree)
-    fit1 = spl1(Wi)
-    spl2 = UnivariateSpline(Wi, deltaP, k=degree)
-    fit2 = spl2(Wi)
+def plot_exp (window, figure, fig_, axis1, axis2, Wi, Np, deltaP, degree, Use):      # Plot the experimental values of Np
+    Wi = Wi[(Use == True)] 
+    Np = Np[(Use == True)]
+    deltaP = deltaP[(Use == True)]
+    Coef = np.polyfit(Wi, Np, degree)
+    fit1 = np.polyval(Coef, Wi)
+    Coef = np.polyfit(Wi, deltaP, degree)
+    fit2 = np.polyval(Coef, Wi)
     figure.get_tk_widget().forget()
     axis1.clear()
     axis2.clear()
