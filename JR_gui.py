@@ -8,17 +8,16 @@ import PySimpleGUI as sg
 import numpy as np
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from os import path
-import math
 
 # # --- GUI FUNCTIONS ---
 
-def draw_figure(canvas, figure):                                # Draws a figure in the window canvas
+def draw_figure(canvas, figure):                                    # Draws a figure in the window canvas
     figure_canvas_agg = FigureCanvasTkAgg(figure, canvas)
     figure_canvas_agg.draw()
     figure_canvas_agg.get_tk_widget().pack(side='top', fill='both', expand=1)
     return figure_canvas_agg
 
-def save_window (file, folder):                                 # Dialog window used to save results to a file
+def save_window (file, folder):                                     # Dialog window used to save results to a file
     layout_save = [[sg.Text('Destination Folder',size=(13,1)), sg.InputText(folder,size=(40,1),key='-FOLDER-'), sg.FolderBrowse()],
                    [sg.Text('File Name', size=(13,1)), sg.InputText(file,size=(40,1),key='-FILE-')],
                    [sg.Button('Save'), sg.Button('Cancel')]]
@@ -40,7 +39,7 @@ def settings_window (file, L, D, Vp, Swi, uo, uw, q, ko_Swi, degree):
                    [sg.Button('Done')]]
     return sg.Window('Test Settings', layout_settings, finalize=True, element_justification='left', font=("Arial", 10))
 
-def table_window (Wi, Np, deltaP, Use, fig_ex, degree):
+def table_window (Wi, Np, deltaP, Use, fig_ex, degree):             # Shows table window and populates table with experiment data
     MAX_ROWS = 20
     MAX_COL = 3
     
@@ -60,7 +59,7 @@ def table_window (Wi, Np, deltaP, Use, fig_ex, degree):
     
     return window, fig_canvas_agg_ex
 
-def populate_table (window, Wi, Np, deltaP, Use):    #Populates the table with data expressed as np.array
+def populate_table (window, Wi, Np, deltaP, Use):                   # Populates the table with data expressed as np.array
     print(Wi, Np, deltaP, Use)
     data = np.column_stack((Wi, Np, deltaP, Use))
     
@@ -76,8 +75,7 @@ def populate_table (window, Wi, Np, deltaP, Use):    #Populates the table with d
                 pass
     return
 
-def extract_values(table, Wi, Np, deltaP, Use):              #Gets the values from the table and forms arrays
-    # Use=np.ones(Wi.size, dtype=bool)
+def extract_values(table, Wi, Np, deltaP, Use):                     # Gets the values from the table and forms arrays
     data = np.column_stack((Wi,Np, deltaP, Use))
     for i, row in enumerate(data):
         for j, item in enumerate(row):
@@ -88,13 +86,13 @@ def extract_values(table, Wi, Np, deltaP, Use):              #Gets the values fr
     Use=data[:,3]
     return Wi, Np, deltaP, Use
 
-def input_error (message):
+def input_error (message):                                          # Show a window with the specified message return window descriptor
     layout = [[sg.Text(message)],
               [sg.Button('OK')]]
     window = sg.Window('ERROR',layout, finalize=False, element_justification='center', font=("Arial", 10))
     return window
 
-def calc_input_validation (Vp, Swi, q, L, D, uw, uo, ko_Swi, degree, Wi, Np, deltaP, Use):
+def calc_input_validation (Vp, Swi, q, L, D, uw, uo, ko_Swi, degree, Wi, Np, deltaP, Use):      # Validates all the parameters and tables to avoid errors in the calculations
     Wi = Wi[(Use == True)] 
     Np = Np[(Use == True)] 
     deltaP = deltaP[(Use == True)] 
@@ -109,7 +107,7 @@ def calc_input_validation (Vp, Swi, q, L, D, uw, uo, ko_Swi, degree, Wi, Np, del
     else:
         return True
 
-def table_input_validation (Wi, Np, deltaP):    
+def table_input_validation (Wi, Np, deltaP):                        # Validates the data in the Table window (experimental data cannot be all zero)
     if np.all(Np==0) or np.all(Wi==0) or np.all(deltaP==0):
         window = input_error ('All values are zero in one or more data arrays \nCheck Settings File')
         while True:

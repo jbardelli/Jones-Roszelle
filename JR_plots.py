@@ -8,7 +8,6 @@ import numpy as np
 import JR_gui as gui         # Custom module for windows layouts and functions
 
 #--- PLOT FUNCTIONS ---
-
 def plot_np (window, figure, fig_, axis, Qi, Avg_Sw, Swm, switch):                      # Plot the average sw with calculated sw
     figure.get_tk_widget().forget()
     if switch == True:
