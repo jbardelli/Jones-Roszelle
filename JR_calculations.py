@@ -11,6 +11,7 @@ import math as m
 import pandas as pd
 from scipy import interpolate
 from scipy.optimize import minimize
+import JR_gui as gui         # Custom module for windows layouts and functions
 
 def get_data_table (file):
     data = pd.read_csv(file, index_col=0)                       # Import Data Table
@@ -37,19 +38,28 @@ def differ_sw (x, Swi, Np, Vp, Qi, degree):
     a, b = x
     Avg_Sw=(Swi/100+Np/Vp)*100                                  # Calculate average water saturation
     Pvi_Tr=(Qi+a)**b                                            # Transform axis
-    Coef_Pol=poly.polyfit(Pvi_Tr, Avg_Sw, degree)
-    Swm_calc=poly.polyval((Qi+a)**b, Coef_Pol)
-    result=np.sum((Avg_Sw-Swm_calc)**2)
-    return result
+    try:
+        Coef_Pol=poly.polyfit(Pvi_Tr, Avg_Sw, degree)
+    except:
+        gui.input_error('Error')
+        return 0
+    else:
+        Swm_calc=poly.polyval((Qi+a)**b, Coef_Pol)
+        result=np.sum((Avg_Sw-Swm_calc)**2)
+        return result
 
 def differ_lambda (x, deltaP, q, dpb_qb, Qi, uw, degree):
     a, b = x
     lambda1=uw*(deltaP/q)/dpb_qb
     Pvi_L=(Qi+a)**b
-    Coef_Pol=poly.polyfit(Pvi_L, lambda1, degree)
-    lambda1_calc=poly.polyval((Qi+a)**b, Coef_Pol)
-    result=np.sum((lambda1-lambda1_calc)**2)
-    return result
+    try:
+        Coef_Pol=poly.polyfit(Pvi_L, lambda1, degree)
+    except:
+        return 0
+    else:
+        lambda1_calc=poly.polyval((Qi+a)**b, Coef_Pol)
+        result=np.sum((lambda1-lambda1_calc)**2)
+        return result
 
 def lsq_let_kro (x, Swn, kro):
     L, E, T = x
@@ -71,7 +81,7 @@ def krw_LET (Lw, Ew, Tw, Swn, krw_Sor):
     krw_fit=(krw_Sor*(Swn**Lw))/((Swn**Lw)+Ew*((1-Swn)**Tw))
     return krw_fit
 
-def calc_kr (Vp, Swi, q, L, D, uw, uo, ko_Swi, degree, Wi, Np, deltaP, Use):
+def calc_kr (Vp, Swi, q, L, D, uw, uo, ko_Swi, degree, Wi, Np, deltaP, Use, extrap):
     Wi = Wi[(Use == True)]                                      # Slice the arrays, take only the rows whose checkbox is True
     Np = Np[(Use == True)]
     deltaP = deltaP[(Use == True)]
@@ -81,7 +91,7 @@ def calc_kr (Vp, Swi, q, L, D, uw, uo, ko_Swi, degree, Wi, Np, deltaP, Use):
     
     #------- Solve the a & b values that fit Avg_Sw curve ----
     x0 = [1,1]
-    result = minimize(differ_sw,x0, args=(Swi, Np, Vp, Qi, degree), bounds=((-0.2,100),(-100,100)))
+    result = minimize(differ_sw, x0, args=(Swi, Np, Vp, Qi, degree), bounds=((-0.2,100),(-100,100)))
     print("\nLeast square value for Sw: ", '%.3f' %differ_sw(result.x, Swi, Np, Vp, Qi, degree))
     a, b = result.x
     print("Values of a= ", '%.3f' %a, " and b= ", '%.3f' %b)
@@ -101,7 +111,7 @@ def calc_kr (Vp, Swi, q, L, D, uw, uo, ko_Swi, degree, Wi, Np, deltaP, Use):
     
     #------- Solve the a & b values that fit lambda1 curve ----
     x0 = [0,0]
-    result = minimize(differ_lambda,x0, args=(deltaP, q, dpb_qb, Qi, uw, degree), bounds=((-0.2,100),(-100,100)))
+    result = minimize(differ_lambda, x0, args=(deltaP, q, dpb_qb, Qi, uw, degree), bounds=((-0.2,100),(-100,100)))
     print("\nLeast square value for Lambda1: ", '%.3f' %differ_lambda(result.x, deltaP, q, dpb_qb, Qi, uw, degree))
     a, b = result.x
     print("Values of a= ", '%.3f' %a, " and b= ", '%.3f' %b)
@@ -124,7 +134,12 @@ def calc_kr (Vp, Swi, q, L, D, uw, uo, ko_Swi, degree, Wi, Np, deltaP, Use):
     Swf1=Sw_extrap(0)
     Sw_extrap=interpolate.interp1d(1/Qi,Avg_Sw,kind='linear',fill_value='extrapolate')
     Swf2=Sw_extrap(0)
-    Swf=Swf1                                                    # I use the extrapolation of Sw2
+    if extrap == 'Sw2':
+        Swf = Swf1                                              # Use extrapolation of Sw2
+    if extrap == 'Swm':
+        Swf = Swf2                                              # Use extrapolation of Swm
+    if extrap == 'Avg':
+        Swf = (Swf1 + Swf2)/2                                   # Use the average of the two extrapolations (Sw2 and Swm)
     Sor=(100-Swf)                                               # Calculate Sor
     
     #--- Extrapolate krw to Sor to obtain krw at infinite pore volumes ---

@@ -1,4 +1,4 @@
-# print(- coding: utf-8 -*-
+
 """
 Created on Sun Apr 23 20:35:54 2017
 @author: jbardelli
@@ -15,13 +15,15 @@ from os import path
 
 #---------------------------------
 #--- Variables ---
-Wi=Np=deltaP=Swi=Sor=Vp=uw=uo=L=D=ko_Swi=krw_Sor=q=data=0.0
-Use=True
+Swi=Sor=Vp=uw=uo=L=D=ko_Swi=krw_Sor=q=data=0.0
+Wi=Np=deltaP=np.zeros(3,dtype=float)                            # Initiate the arrays as zero to allow input validation to run when the data file has not been selected
+Use=np.ones(3, dtype=int)                                       # Initiate the Use array to ones to allow input validation to run
 degree = 2
 data_file       = ""
-report_folder   = ""
-report_file     = ""
-
+report_folder   = None
+report_file     = None
+kr_table = np.zeros((20,4),dtype=float)
+kr_headings = ['Sw', 'kro', 'krw', 'fw']
 # # --- Beginning of GUI CODE ---
 # Define plots
 plt.ioff()  
@@ -33,17 +35,18 @@ fig_ex, bx1 = plt.subplots()
 bx2 = bx1.twinx()
    
 # define the main window layout
-column_layout = [[sg.Text('Swi (%) =', size=(15,1)), sg.Text(Swi, key='-SWI-',size=(10,1))],
-                 [sg.Text('Sro (%) =', size=(15,1)), sg.Text(Sor, key='-SOR-',size=(10,1))],
-                 [sg.Text('Krw@Sor =', size=(15,1)), sg.Text(krw_Sor, key='-KRW-',size=(10,1))],
-                 [sg.Text('Kro@Swi =', size=(15,1)), sg.Text(str(1) , key='-KRO-',size=(10,1))],
-                 [sg.Text('Kw@Sor (mD) =', size=(15,1)), sg.Text(krw_Sor*ko_Swi, key='-KW-',size=(10,1))],
-                 [sg.Text('Ko@Swi (mD) =', size=(15,1)), sg.Text(ko_Swi, key='-KO-',size=(10,1))],
-                 [sg.Text('Pol. degree =', size=(15,1)), sg.Text(degree, key='-POLDEG-',size=(10,1))]]
+column_layout = [[sg.Text('Swi (%)', size=(10,1)), sg.Text(Swi, key='-SWI-',size=(10,1))],
+                 [sg.Text('Sro (%) ', size=(10,1)), sg.Text(Sor, key='-SOR-',size=(10,1))],
+                 [sg.Text('Krw@Sor ', size=(10,1)), sg.Text(krw_Sor, key='-KRW-',size=(10,1))],
+                 [sg.Text('Kro@Swi', size=(10,1)), sg.Text(str(1) , key='-KRO-',size=(10,1))],
+                 [sg.Text('Kw@Sor (mD)', size=(10,1)), sg.Text(krw_Sor*ko_Swi, key='-KW-',size=(10,1))],
+                 [sg.Text('Ko@Swi (mD)', size=(10,1)), sg.Text(ko_Swi, key='-KO-',size=(10,1))],
+                 [sg.Text('Pol. degree', size=(10,1)), sg.Text(degree, key='-POLDEG-',size=(18,1))],
+                 [sg.Text('Ext. using', size=(10,1)), sg.Combo(['Sw2','Swm','Avg'], default_value='Sw2',key='-EXT-', size=(7,1))]]
                  
 layout_main = [[sg.Text('Jones-Roszelle Relative Permeability')],
               [sg.Canvas(key='-NP-'),sg.Canvas(key='-KR-'),sg.Column(column_layout)],
-              [sg.Canvas(key='-DP-'),sg.Canvas(key='-FW-'),sg.Text('', size=(28,1))],
+              [sg.Canvas(key='-DP-'),sg.Canvas(key='-FW-'),sg.Table(kr_table.tolist(), headings=kr_headings,  col_widths=(7,7,7,7),auto_size_columns = False, num_rows=20,  hide_vertical_scroll = True,key='-KR_TABLE-',)],
               [sg.Button('Settings'),sg.Button('Table'),sg.Button('Clear'),sg.Button('Close'),sg.Button('Calculate'),sg.Button('Save Results')]]
 
 # create the form and show it without the plot
@@ -114,38 +117,39 @@ while(True):
             
     if event == "Calculate":                                        # Calculate Button pressed
         if gui.calc_input_validation (Vp, Swi, q, L, D, uw, uo, ko_Swi, degree, Wi, Np, deltaP, Use):
-            results=jr.calc_kr(Vp, Swi, q, L, D, uw, uo, ko_Swi, degree, Wi, Np, deltaP, Use)  # Calculate Kr curves
+            extrap = values['-EXT-']
+            results=jr.calc_kr(Vp, Swi, q, L, D, uw, uo, ko_Swi, degree, Wi, Np, deltaP, Use, extrap)  # Calculate Kr curves
             Qi, Avg_Sw, Swm_calc, lambda2, kro, krw, kro_fit, krw_fit, Sw2, Sor, Swf, kro_Swi, krw_Sor, fw = results
             fig_canvas_agg_kr = plots.plot_kr(window, fig_canvas_agg_kr, fig_kr, ax1, Sw2, kro, krw, Swi, Swf, True)        #Plot Kr curves
             fig_canvas_agg_fw = plots.plot_fw(window, fig_canvas_agg_fw, fig_fw, ax2, Sw2, fw, Swi, Swf, True)              #Plot fw curve
             fig_canvas_agg_np = plots.plot_np(window, fig_canvas_agg_np, fig_np, ax3, Qi, Avg_Sw, Swm_calc, True)           #Plot fw curve
             fig_canvas_agg_dp = plots.plot_dp(window, fig_canvas_agg_dp, fig_dp, ax4, Qi, lambda2, True)                    #Plot lambda2 curve  
             gui.populate_results(window, Swi, Sor, krw_Sor, ko_Swi, degree)
+            gui.populate_kr_table(window, kr_table, Sw2, kro, krw, fw)
             
     if event == "Clear":                                            # Clear Button pressed
         fig_canvas_agg_kr = plots.plot_kr(window, fig_canvas_agg_kr, fig_kr, ax1, Sw2, kro_fit, krw_fit, Swi, Swf, False)     #Clear all plots
         fig_canvas_agg_fw = plots.plot_fw(window, fig_canvas_agg_fw, fig_fw, ax2, Sw2, fw, Swi, Swf, False)                   #Clear all plots
         fig_canvas_agg_np = plots.plot_np(window, fig_canvas_agg_np, fig_np, ax3, Qi, Avg_Sw, Swm_calc, False)                #Clear all plots
         fig_canvas_agg_dp = plots.plot_dp(window, fig_canvas_agg_dp, fig_dp, ax4, Qi, lambda2, False)                         #Clear all plots
+        gui.clear_results(window, degree)
+        gui.clear_kr_table(window, kr_table)
     
     if event == "Save Results":                                     # Save Results Button pressed
         if Sor==0 or krw_Sor==0 or not path.isfile(data_file):      # Check if there are results to be saved or if the data file exists (it's needed to get original values)
-            window_err = gui.input_error('No results to save or data file is non existent')
-            while True:                                             # Show error and wait for OK button
-                event, values = window_err.read()
-                if event == 'OK':
-                    window_err.close()
-                    break
+            gui.input_error('No results to save or data file is non existent')
         else:                                                       # if there are results and data file, the open the save dialog window
             window_save = gui.save_window(report_file, report_folder)
             while True:
                 event_save, values_save = window_save.read()
                 if event_save == "Cancel" or event_save == sg.WIN_CLOSED:
+                    report_folder = values_save['-FOLDER-']
                     window_save.close()
                     break
                 if event_save == "Save":                            # If Save is pressed, get original values from data_file             
                     Wiexp, Npexp, deltaPexp, Use = Wio, Npo, dPo, Use = jr.get_data_table (data_file)
-                    report_path = values_save['-FOLDER-'] + '/' + values_save['-FILE-'] + '.xls'    # Format the complete report file PATH
+                    report_folder = values_save['-FOLDER-']  
+                    report_path = report_folder + '/' + values_save['-FILE-'] + '.xls'    # Format the complete report file PATH
                     if gui.file_exists_check(report_path):                      # If file does not exists, then save
                         print('Saving to ', report_path)
                         jrsave.save_to_file(report_path, Swi, L, D, Vp, uo, uw, q, ko_Swi, Sor, Swf, krw_Sor, Wi, Np, deltaP, Sw2, kro, krw, Wiexp, Npexp, deltaPexp, degree)     

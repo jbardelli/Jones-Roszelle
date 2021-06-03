@@ -18,7 +18,7 @@ def draw_figure(canvas, figure):                                    # Draws a fi
     return figure_canvas_agg
 
 def save_window (file, folder):                                     # Dialog window used to save results to a file
-    layout_save = [[sg.Text('Destination Folder',size=(13,1)), sg.InputText(folder,size=(40,1),key='-FOLDER-'), sg.FolderBrowse()],
+    layout_save = [[sg.Text('Destination Folder',size=(13,1)), sg.InputText(folder,size=(40,1),key='-FOLDER-'), sg.FolderBrowse(initial_folder = folder)],
                    [sg.Text('File Name', size=(13,1)), sg.InputText(file,size=(40,1),key='-FILE-')],
                    [sg.Button('Save'), sg.Button('Cancel')]]
     return sg.Window('Save Results', layout_save, finalize=True, element_justification='left', font=("Arial", 10))
@@ -90,31 +90,26 @@ def input_error (message):                                          # Show a win
     layout = [[sg.Text(message)],
               [sg.Button('OK')]]
     window = sg.Window('ERROR',layout, finalize=False, element_justification='center', font=("Arial", 10))
-    return window
+    while True:
+            event, values = window.read()
+            if event == 'OK':
+                window.close()
+                break
+    return
 
 def calc_input_validation (Vp, Swi, q, L, D, uw, uo, ko_Swi, degree, Wi, Np, deltaP, Use):      # Validates all the parameters and tables to avoid errors in the calculations
     Wi = Wi[(Use == True)] 
     Np = Np[(Use == True)] 
     deltaP = deltaP[(Use == True)] 
     if Vp == 0 or Swi == 0 or q == 0 or L == 0 or D == 0 or uo == 0 or uw == 0 or ko_Swi == 0 or degree == 0 or np.any(Np==0) or np.any(Wi==0) or np.any(deltaP==0):
-        window = input_error ('One or more values are zero \nCheck Settings and Table')
-        while True:
-            event, values = window.read()
-            if event == 'OK':
-                window.close()
-                break
+        input_error ('One or more values are zero \nCheck Settings and Table')
         return False
     else:
         return True
 
 def table_input_validation (Wi, Np, deltaP):                        # Validates the data in the Table window (experimental data cannot be all zero)
     if np.all(Np==0) or np.all(Wi==0) or np.all(deltaP==0):
-        window = input_error ('All values are zero in one or more data arrays \nCheck Settings File')
-        while True:
-            event, values = window.read()
-            if event == 'OK':
-                window.close()
-                break
+        input_error ('All values are zero in one or more data arrays \nCheck Settings File')
         return False
     else:
         return True
@@ -122,15 +117,13 @@ def table_input_validation (Wi, Np, deltaP):                        # Validates 
 def file_open_check (file_n):                                       # Checks if target file is open
     try:
         myfile = open (file_n, "r+")
-        myfile.close()
-        return False   
+        myfile.close()  
     except IOError:    
-        window = input_error ('File is already open')               # Show error if file already open
-        event, values = window.read()
-        if event == 'OK':
-            window.close()
-            return True
-
+        input_error ('File is already open')               # Show error if file already open
+        return True
+    else:
+        return False
+    
 def file_exists_check (file_n):                                     # Checks if target file exists, returns TRUE (open or non existent) and FALSE (closed or Overwrite)
     layout = [[sg.Text('File already exists, overwrite?')],
               [sg.Button('YES'), sg.Button('NO')]]
@@ -159,4 +152,30 @@ def populate_results (window, Swi, Sor, krw_Sor, ko_Swi, degree):   # Populates 
     window['-KW-'].update(float('%.3g' %(krw_Sor*ko_Swi)))
     window['-KO-'].update(float('%.3g' %ko_Swi))
     window['-POLDEG-'].update(degree)
+    return
+
+def clear_results(window, degree):
+    window['-SWI-'].update(np.round(0,1))                         # Results are populated after the rel. perm calculation
+    window['-SOR-'].update(np.round(0,1))
+    window['-KRW-'].update(np.round(0,3))
+    window['-KRO-'].update(np.round(1,3))
+    window['-KW-'].update(float('%.3g' %(0)))
+    window['-KO-'].update(float('%.3g' %(0)))
+    window['-POLDEG-'].update(degree)
+    window['-EXT-'].update('Sw2')
+    return
+
+def populate_kr_table(window, table, Sw2, kro, krw, fw):
+    table = np.zeros((20,4),dtype=float)
+    for i in range (0, np.size(Sw2)-1):
+       table[i,0] = np.round(Sw2[i],1)
+       table[i,1] = np.round(kro[i],3)
+       table[i,2] = np.round(krw[i],3)
+       table[i,3] = np.round(fw[i], 3)
+    window['-KR_TABLE-'].update(table.tolist())
+    return
+
+def clear_kr_table(window, table):
+    table = np.zeros((20,4),dtype=float)
+    window['-KR_TABLE-'].update(table.tolist())
     return
