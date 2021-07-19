@@ -11,24 +11,55 @@ import math as m
 import pandas as pd
 from scipy import interpolate
 from scipy.optimize import minimize
+import JR_gui as gui         # Custom module for windows layouts and functions
+
+def get_data_table (file):
+    data = pd.read_csv(file, index_col=0)                       # Import Data Table
+    
+    #print("\nRAW EXPERIMENTAL DATA\n",data)
+    #print("\nTabla de datos a partir del BT\n",data)
+    
+    Widf = data['Wi (ml)']                                      # Get the panda data frames from the file
+    Npdf = data['Np (ml)']
+    deltaPdf = data ['deltaP (psi)']
+    
+    Wi=Widf.to_numpy()                                          # Convert panda DataFrame to numpy array for calculations
+    Np=Npdf.to_numpy()
+    deltaP=deltaPdf.to_numpy()
+               
+    Wi=np.delete (Wi,[0])                                       # Delete first position to avoid NaN error in optimization functions
+    Np=np.delete (Np,[0])
+    deltaP=np.delete(deltaP,[0])
+    Use=np.ones(Wi.size, dtype=bool)
+    result = (Wi, Np, deltaP, Use)
+    return result
 
 def differ_sw (x, Swi, Np, Vp, Qi, degree):
     a, b = x
-    Avg_Sw=(Swi/100+Np/Vp)*100          # Calculate average water saturation
-    Pvi_Tr=(Qi+a)**b                      # Transfor axis
-    Coef_Pol=poly.polyfit(Pvi_Tr, Avg_Sw, degree)
-    Swm_calc=poly.polyval((Qi+a)**b, Coef_Pol)
-    result=np.sum((Avg_Sw-Swm_calc)**2)
-    return result
+    Avg_Sw=(Swi/100+Np/Vp)*100                                  # Calculate average water saturation
+    Pvi_Tr=(Qi+a)**b                                            # Transform axis
+    try:
+        Coef_Pol=poly.polyfit(Pvi_Tr, Avg_Sw, degree)
+    except:
+        gui.input_error('Error')
+        return 0
+    else:
+        Swm_calc=poly.polyval((Qi+a)**b, Coef_Pol)
+        result=np.sum((Avg_Sw-Swm_calc)**2)
+        return result
 
 def differ_lambda (x, deltaP, q, dpb_qb, Qi, uw, degree):
     a, b = x
     lambda1=uw*(deltaP/q)/dpb_qb
     Pvi_L=(Qi+a)**b
-    Coef_Pol=poly.polyfit(Pvi_L, lambda1, degree)
-    lambda1_calc=poly.polyval((Qi+a)**b, Coef_Pol)
-    result=np.sum((lambda1-lambda1_calc)**2)
-    return result
+    try:
+        Coef_Pol=poly.polyfit(Pvi_L, lambda1, degree)
+    except:
+        return 0
+    else:
+        lambda1_calc=poly.polyval((Qi+a)**b, Coef_Pol)
+        result=np.sum((lambda1-lambda1_calc)**2)
+        return result
 
 def lsq_let_kro (x, Swn, kro):
     L, E, T = x
@@ -50,53 +81,37 @@ def krw_LET (Lw, Ew, Tw, Swn, krw_Sor):
     krw_fit=(krw_Sor*(Swn**Lw))/((Swn**Lw)+Ew*((1-Swn)**Tw))
     return krw_fit
 
-def calc_kr (Vp, Swi, q, L, D, uw, uo, ko_Swi, degree, file):
-    
-    data = pd.read_csv(file, index_col=0)    # Import Data Table
-    print("\nRAW EXPERIMENTAL DATA\n",data)
-    
-    # BTpoint=0
-    # data=data.drop(data.index[[range(0,BTpoint)]])
-    #print("\nTabla de datos a partir del BT\n",data)
-    
-    Widf = data['Wi (ml)']              #Get the panda data frames from the file
-    Npdf = data['Np (ml)']
-    deltaPdf = data ['deltaP (psi)']
-    
-    Wi=Widf.to_numpy()                  #Convert panda DataFrame to numpy array for calculations
-    Np=Npdf.to_numpy()
-    deltaP=deltaPdf.to_numpy()
-    
-    Wi=np.delete (Wi,[0,1])             #Delete first position to avoid NaN error in optimization functions
-    Np=np.delete (Np,[0,1])
-    deltaP=np.delete(deltaP,[0,1])
+def calc_kr (Vp, Swi, q, L, D, uw, uo, ko_Swi, degree, Wi, Np, deltaP, Use, extrap):
+    Wi = Wi[(Use == True)]                                      # Slice the arrays, take only the rows whose checkbox is True
+    Np = Np[(Use == True)]
+    deltaP = deltaP[(Use == True)]
     
     Qi=Wi/Vp                            #Calculate pore volumes injected
-    dpb_qb = uw*(L/(m.pi*D**2/4))*(1/ko_Swi)*14.69/3600*1000    #Calculate deltapb/qb (see Jones paper)
+    dpb_qb = uw*(L/(m.pi*D**2/4))*(1/ko_Swi)*14.69/3600*1000    # Calculate deltapb/qb (see Jones paper)
     
     #------- Solve the a & b values that fit Avg_Sw curve ----
     x0 = [1,1]
-    result = minimize(differ_sw,x0, args=(Swi, Np, Vp, Qi, degree), bounds=((-0.2,100),(-100,100)))
+    result = minimize(differ_sw, x0, args=(Swi, Np, Vp, Qi, degree), bounds=((-0.2,100),(-100,100)))
     print("\nLeast square value for Sw: ", '%.3f' %differ_sw(result.x, Swi, Np, Vp, Qi, degree))
     a, b = result.x
     print("Values of a= ", '%.3f' %a, " and b= ", '%.3f' %b)
     
     #--- Calculate Sw2 with the a & b values obtained before ---
-    Avg_Sw=(Swi/100+Np*Qi/Wi)*100                       #Calculate average water saturation
-    Pvi_Tr=(Qi+a)**b                                    #Transform axis
-    Coef_Pol=poly.polyfit(Pvi_Tr,Avg_Sw,degree)         #Calculate polinomial coefficientes that fit the Pvi_Tr curve
-    Swm_calc=poly.polyval((Qi+a)**b,Coef_Pol)           #Calculate Average water sat with the coefficients obtained
+    Avg_Sw=(Swi/100+Np*Qi/Wi)*100                               # Calculate average water saturation
+    Pvi_Tr=(Qi+a)**b                                            # Transform axis
+    Coef_Pol=poly.polyfit(Pvi_Tr,Avg_Sw,degree)                 # Calculate polinomial coefficientes that fit the Pvi_Tr curve
+    Swm_calc=poly.polyval((Qi+a)**b,Coef_Pol)                   # Calculate Average water sat with the coefficients obtained
     delta=(np.max(Qi)-np.min(Qi))/1000
     Swm_plus=poly.polyval(((Qi+a+delta)**b),Coef_Pol)
     Swm_minus=poly.polyval(((Qi+a-delta)**b),Coef_Pol)
-    deriv=(Swm_plus-Swm_minus)/(2*delta)                #Calculate the derivative using deltas
-    Sw2=Avg_Sw-Qi*deriv                                 #Calculate the saturation at the outlet face Sw2
-    fo2=(Avg_Sw-Sw2)/(Qi*100)                           #Calculate fractional flow of oil
-    fw2=1-fo2                                           #Fractional flow of water
+    deriv=(Swm_plus-Swm_minus)/(2*delta)                        # Calculate the derivative using deltas
+    Sw2=Avg_Sw-Qi*deriv                                         # Calculate the saturation at the outlet face Sw2
+    fo2=(Avg_Sw-Sw2)/(Qi*100)                                   # Calculate fractional flow of oil
+    fw2=1-fo2                                                   # Fractional flow of water
     
     #------- Solve the a & b values that fit lambda1 curve ----
     x0 = [0,0]
-    result = minimize(differ_lambda,x0, args=(deltaP, q, dpb_qb, Qi, uw, degree), bounds=((-0.2,100),(-100,100)))
+    result = minimize(differ_lambda, x0, args=(deltaP, q, dpb_qb, Qi, uw, degree), bounds=((-0.2,100),(-100,100)))
     print("\nLeast square value for Lambda1: ", '%.3f' %differ_lambda(result.x, deltaP, q, dpb_qb, Qi, uw, degree))
     a, b = result.x
     print("Values of a= ", '%.3f' %a, " and b= ", '%.3f' %b)
@@ -119,35 +134,40 @@ def calc_kr (Vp, Swi, q, L, D, uw, uo, ko_Swi, degree, file):
     Swf1=Sw_extrap(0)
     Sw_extrap=interpolate.interp1d(1/Qi,Avg_Sw,kind='linear',fill_value='extrapolate')
     Swf2=Sw_extrap(0)
-    Swf=Swf1                            # I use the extrapolation of Sw2
-    Sor=(100-Swf)                       # Calculate Sor
+    if extrap == 'Sw2':
+        Swf = Swf1                                              # Use extrapolation of Sw2
+    if extrap == 'Swm':
+        Swf = Swf2                                              # Use extrapolation of Swm
+    if extrap == 'Avg':
+        Swf = (Swf1 + Swf2)/2                                   # Use the average of the two extrapolations (Sw2 and Swm)
+    Sor=(100-Swf)                                               # Calculate Sor
     
     #--- Extrapolate krw to Sor to obtain krw at infinite pore volumes ---
     krw_extrap=interpolate.interp1d(Sw2,krw,kind='linear',fill_value='extrapolate')
     krw_Sor=krw_extrap(Swf)
     fw=1/(1+(kro/krw)*(uw/uo))
     
-    Sw2=np.append(Sw2,Swf)              # Add the extrapolated values at Sor
+    Sw2=np.append(Sw2,Swf)                                      # Add the extrapolated values at Sor
     kro=np.append(kro,0)
     krw=np.append(krw,krw_Sor)
     fw=np.append(fw,1)
     
-    Sw2=np.insert(Sw2,0,Swi)            # Add the values at Swi
+    Sw2=np.insert(Sw2,0,Swi)                                    # Add the values at Swi
     krw=np.insert(krw,0,0)
     kro=np.insert(kro,0,1)
     fw=np.insert(fw,0,0)
      
     #------- Solve the LET for kro ----
-    Swn = (Sw2-Swi)/(Swf-Swi)                               #Swn is needed for the LET fitting to smooth the kr curves
-    x0 = [1,1,1]                                            #Initial guess for minimize function
-    result = minimize(lsq_let_kro, x0, args=(Swn, kro))     #minimize the least square func. using x0
-    Lo, Eo, To = result.x                                   #minimize returns the L, E, and T parameters that best fit kro
-    kro_fit = kro_LET (Lo, Eo, To, Swn)                     #Calculate kro array with the LET parameters
+    Swn = (Sw2-Swi)/(Swf-Swi)                                   # Swn is needed for the LET fitting to smooth the kr curves
+    x0 = [1,1,1]                                                # Initial guess for minimize function
+    result = minimize(lsq_let_kro, x0, args=(Swn, kro))         # minimize the least square func. using x0
+    Lo, Eo, To = result.x                                       # minimize returns the L, E, and T parameters that best fit kro
+    kro_fit = kro_LET (Lo, Eo, To, Swn)                         # Calculate kro array with the LET parameters
     
     #------- Solve the LET for krw ----
-    result = minimize(lsq_let_krw, x0, args=(Swn, krw, krw_Sor))    #minimize the least square func. using x0
-    Lw, Ew, Tw = result.x                                           #minimize returns the L, E, and T parameters that best fit krw    
-    krw_fit = krw_LET (Lw, Ew, Tw, Swn, krw_Sor)                    #Calculate krw array with the LET parameters
+    result = minimize(lsq_let_krw, x0, args=(Swn, krw, krw_Sor))# minimize the least square func. using x0
+    Lw, Ew, Tw = result.x                                       # minimize returns the L, E, and T parameters that best fit krw    
+    krw_fit = krw_LET (Lw, Ew, Tw, Swn, krw_Sor)                # Calculate krw array with the LET parameters
     
     #--- PRINT RESULTS ---
     print("\n---- RESULTS ---")
@@ -180,7 +200,7 @@ def calc_kr (Vp, Swi, q, L, D, uw, uo, ko_Swi, degree, file):
     df_let['krw'] = df_let['krw'].map("{:,.3f}".format).astype(float)
     print(df_let) 
   
-    result = (Qi, Avg_Sw, Swm_calc, lambda2, kro, krw, kro_fit, krw_fit, Sw2, Sor, Swf, kro[0], krw_Sor)
+    result = (Qi, Avg_Sw, Swm_calc, lambda2, kro, krw, kro_fit, krw_fit, Sw2, Sor, Swf, kro[0], krw_Sor, fw)
     
     return result
 

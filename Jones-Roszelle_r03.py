@@ -1,104 +1,79 @@
-# print(- coding: utf-8 -*-
+
 """
 Created on Sun Apr 23 20:35:54 2017
-
 @author: jbardelli
 """
 
-import pandas as pd
 import numpy as np
-import numpy.polynomial.polynomial as poly
 import matplotlib.pyplot as plt
-from scipy import interpolate
-from scipy.optimize import minimize
 import PySimpleGUI as sg
-from styleframe import StyleFrame, Styler, utils
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import JR_calculations as jr # Custom module with the calculations for Jones-Roszelle method
-
-# # --- GUI FUNCTIONS ---
-
-def draw_figure(canvas, figure):
-    figure_canvas_agg = FigureCanvasTkAgg(figure, canvas)
-    figure_canvas_agg.draw()
-    figure_canvas_agg.get_tk_widget().pack(side='top', fill='both', expand=1)
-    return figure_canvas_agg
-
-#--- Clears or plots the relative permeability curves ---
-
-def plot_kr (figure, fig_, axis, Sw2, kro, krw, Swi, Swf, switch):
-    figure.get_tk_widget().forget()
-    if switch == True:
-        axis.set_xlabel('Sw')
-        axis.set_ylabel('Kr')
-        axis.scatter(Sw2, krw,c='b', s=12)
-        axis.scatter(Sw2, kro,c='r', s=12)
-        axis.plot([Swi,Swi],[0,100],c='black',ls='--',lw=0.5)
-        axis.plot([Swf,Swf],[0,100],c='black',ls='--',lw=0.5)
-    else:
-        axis.clear()
-        ax1.set_xticks(np.arange(0,101,10))
-    axis.set_yticks(np.arange(0,1.1,0.1))
-    axis.set_xlim(0,100)
-    axis.set_ylim(0,1)
-    axis.grid(True)
-    figure = draw_figure(window['-CANVAS-'].TKCanvas, fig_)
-    return   figure
+import JR_gui as gui         # Custom module for windows layouts and functions
+import JR_plots as plots     # Custom module for varios types of predefined plots used in the main window
+import JR_save as jrsave     # Custom module for saving results to Excel file
+from os import path
 
 #---------------------------------
-#--- TEST DATA Variables ---
-Swi=Vp=uw=uo=L=D=ko_Swi=q=0.0
-degree=2
-file = " "
-
+#--- Variables ---
+Swi=Sor=Vp=uw=uo=L=D=ko_Swi=krw_Sor=q=data=0.0
+Wi=Np=deltaP=np.zeros(3,dtype=float)                            # Initiate the arrays as zero to allow input validation to run when the data file has not been selected
+Use=np.ones(3, dtype=int)                                       # Initiate the Use array to ones to allow input validation to run
+degree = 2
+data_file       = ""
+report_folder   = None
+report_file     = None
+kr_table = np.zeros((20,4),dtype=float)
+kr_headings = ['Sw', 'kro', 'krw', 'fw']
 # # --- Beginning of GUI CODE ---
-# Define plot
+# Define plots
 plt.ioff()  
-plt.figure()
-fig=plt.gcf()
-fig,ax1 = plt.subplots()
-
-
+fig_kr, ax1 = plt.subplots()
+fig_fw, ax2 = plt.subplots()
+fig_np, ax3 = plt.subplots()
+fig_dp, ax4 = plt.subplots() 
+fig_ex, bx1 = plt.subplots()
+bx2 = bx1.twinx()
+   
 # define the main window layout
-layout_main = [[sg.Text('Plot test')],
-              [sg.Canvas(key='-CANVAS-')],
-              [sg.Button('Settings'),sg.Button('Clear'),sg.Button('Close'),sg.Button('Calculate')]]
-
+column_layout = [[sg.Text('Swi (%)', size=(10,1)), sg.Text(Swi, key='-SWI-',size=(10,1))],
+                 [sg.Text('Sro (%) ', size=(10,1)), sg.Text(Sor, key='-SOR-',size=(10,1))],
+                 [sg.Text('Krw@Sor ', size=(10,1)), sg.Text(krw_Sor, key='-KRW-',size=(10,1))],
+                 [sg.Text('Kro@Swi', size=(10,1)), sg.Text(str(1) , key='-KRO-',size=(10,1))],
+                 [sg.Text('Kw@Sor (mD)', size=(10,1)), sg.Text(krw_Sor*ko_Swi, key='-KW-',size=(10,1))],
+                 [sg.Text('Ko@Swi (mD)', size=(10,1)), sg.Text(ko_Swi, key='-KO-',size=(10,1))],
+                 [sg.Text('Pol. degree', size=(10,1)), sg.Text(degree, key='-POLDEG-',size=(18,1))],
+                 [sg.Text('Ext. using', size=(10,1)), sg.Combo(['Sw2','Swm','Avg'], default_value='Sw2',key='-EXT-', size=(7,1))]]
+                 
+layout_main = [[sg.Text('Jones-Roszelle Relative Permeability')],
+              [sg.Canvas(key='-NP-'),sg.Canvas(key='-KR-'),sg.Column(column_layout)],
+              [sg.Canvas(key='-DP-'),sg.Canvas(key='-FW-'),sg.Table(kr_table.tolist(), headings=kr_headings,  col_widths=(7,7,7,7),auto_size_columns = False, num_rows=20,  hide_vertical_scroll = True,key='-KR_TABLE-',)],
+              [sg.Button('Settings'),sg.Button('Table'),sg.Button('Clear'),sg.Button('Close'),sg.Button('Calculate'),sg.Button('Save Results')]]
 
 # create the form and show it without the plot
-window = sg.Window('Jones-Roszelle', layout_main, finalize=True, element_justification='center', font=("Bahnschrift", 11))
+window = sg.Window('Jones-Roszelle', layout_main, finalize=True, element_justification='center', font=("Arial", 10), location=(0,0))
 
-# add the plot to the window
-fig_canvas_agg = draw_figure(window['-CANVAS-'].TKCanvas, fig)
+# add the plots to the windows
+fig_canvas_agg_np = gui.draw_figure(window['-NP-'].TKCanvas, fig_np)
+fig_canvas_agg_dp = gui.draw_figure(window['-DP-'].TKCanvas, fig_dp)
+fig_canvas_agg_kr = gui.draw_figure(window['-KR-'].TKCanvas, fig_kr)
+fig_canvas_agg_fw = gui.draw_figure(window['-FW-'].TKCanvas, fig_fw)
+fit_degree = 2
 
 while(True):
-
     event, values = window.read()
     print(values)
      
-    if event == "Close" or event == sg.WIN_CLOSED:
+    if event == "Close" or event == sg.WIN_CLOSED:                  # Close the Main window
         break
-    if event == "Settings":
+    
+    if event == "Settings":                                         # Settings Button pressed (opens wdw to set the data_file and all the experiment parameters)
         #--- Open Settings Window ---
-        layout_settings = [[sg.Text('Data File:',size=(20,1)),sg.InputText(file,size=(40,1),key='-FILE-'),sg.FileBrowse()],
-                           [sg.Text('Longitude[cm]:',size=(20,1)),sg.InputText(str(L),size=(10,1),key='-L-')],
-                           [sg.Text('Diameter[cm]:',size=(20,1)),sg.InputText(str(D),size=(10,1),key='-D-')],
-                           [sg.Text('Pore Volume[cm3]:',size=(20,1)),sg.InputText(str(Vp),size=(10,1),key='-PV-')],
-                           [sg.Text('Swi[%]:',size=(20,1)),sg.InputText(str(Swi),size=(10,1),key='-SWI-')],
-                           [sg.Text('Oil Viscosity[cP]:',size=(20,1)),sg.InputText(str(uo),size=(10,1),key='-UO-')],
-                           [sg.Text('Water Viscosity[cP]:',size=(20,1)),sg.InputText(str(uw),size=(10,1),key='-UW-')],
-                           [sg.Text('Flow Rate[ml/h]:',size=(20,1)),sg.InputText(str(q),size=(10,1),key='-RATE-')],
-                           [sg.Text('Ko@Swi[mD]:',size=(20,1)),sg.InputText(str(ko_Swi),size=(10,1),key='-KOSWI-')],
-                           [sg.Text('Polinomial degree:',size=(20,1)),sg.InputText(str(degree),size=(10,1),key='-DEGREE-')],
-                           [sg.Button('Done')]]
-        window_set = sg.Window('Test Settings', layout_settings, finalize=True, element_justification='left', font=("Bahnschrift", 11))
-         
+        window_set = gui.settings_window(data_file, L, D, Vp, Swi, uo, uw, q, ko_Swi, degree)     
         while(True):                                                # Wait for events
             event_set, values_set = window_set.read()
-            window_set['-FILE-'].update(values_set['Browse'])       # Update the box with the browsed file name
             if event_set == "Done":                                 #If Done was pressed update all the variables
                 print(values_set)
-                file = values_set['-FILE-']
+                data_file = values_set['-FILE-']
                 L = float(values_set['-L-'])
                 D = float(values_set['-D-'])
                 Vp = float(values_set['-PV-'])
@@ -108,55 +83,79 @@ while(True):
                 q = float(values_set['-RATE-'])
                 ko_Swi = float(values_set['-KOSWI-'])
                 degree = int(values_set['-DEGREE-'])
+                if path.isfile(data_file): Wi, Np, deltaP, Use = Wio, Npo, dPo, Use = jr.get_data_table (data_file)
                 window_set.close()
                 break
-            if event == sg.WINDOW_CLOSED:                           #If window was closed do nothing, ignore entries
+            if event_set == sg.WIN_CLOSED:                              # If window was closed do nothing, ignore entries
                 window_set.close()
                 break
-    if event == "Calculate":
-        results=jr.calc_kr(Vp, Swi, q, L, D, uw, uo, ko_Swi, degree, file)                              #Calculate Kr curves
-        Qi, Avg_Sw, Swm_calc, lambda2, kro, krw, kro_fit, krw_fit, Sw2, Sor, Swf, kro_Swi, krw_Sor = results
-        fig_canvas_agg = plot_kr(fig_canvas_agg, fig, ax1, Sw2, kro_fit, krw_fit, Swi, Swf, True)       #Plot Kr curves
-
-    if event == "Clear":
-        fig_canvas_agg = plot_kr(fig_canvas_agg, fig, ax1, Sw2, kro_fit, krw_fit, Swi, Swf, False)      #Clear all plots
+            else: 
+                window_set['-FILE-'].update(values_set['Browse'])       # Update the box with the browsed file name
+    
+    if event == "Table":                                                # Table Button pressed (Opens table to review or modify experimental data)
+        if gui.table_input_validation (Wi, Np, deltaP):
+            window_table, fig_canvas_agg_ex = gui.table_window (Wi, Np, deltaP, Use, fig_ex, fit_degree)
+            while (True):
+                fig_canvas_agg_ex, fit_np, fit_dp = plots.plot_exp (window_table, fig_canvas_agg_ex, fig_ex, bx1, bx2, Wi, Np, deltaP, fit_degree, Use)
+                event_table, values_table = window_table.read()            
+                if event_table == "Use Table" or event_table == sg.WIN_CLOSED:
+                    window_table.close()
+                    break
+                else: 
+                    fit_degree = int(values_table['-DEG-'])
+                    Wi, Np, deltaP, Use = gui.extract_values(values_table, Wi, Np, deltaP, Use)
+                if event_table == "Use Fit":
+                    Wi = Wi[(Use == True)] 
+                    Use = np.ones(Wi.size, dtype=bool)
+                    Np = np.round_(fit_np, 2)
+                    deltaP = np.round_(fit_dp, 2)
+                    window_table.close()
+                    break
+                if event_table == "Read from File":
+                    Wi, Np, deltaP, Use = Wio, Npo, dPo, Use = jr.get_data_table (data_file)
+                    gui.populate_table (window_table, Wi, Np, deltaP, Use)
+            
+    if event == "Calculate":                                        # Calculate Button pressed
+        if gui.calc_input_validation (Vp, Swi, q, L, D, uw, uo, ko_Swi, degree, Wi, Np, deltaP, Use):
+            extrap = values['-EXT-']
+            results=jr.calc_kr(Vp, Swi, q, L, D, uw, uo, ko_Swi, degree, Wi, Np, deltaP, Use, extrap)  # Calculate Kr curves
+            Qi, Avg_Sw, Swm_calc, lambda2, kro, krw, kro_fit, krw_fit, Sw2, Sor, Swf, kro_Swi, krw_Sor, fw = results
+            fig_canvas_agg_kr = plots.plot_kr(window, fig_canvas_agg_kr, fig_kr, ax1, Sw2, kro, krw, Swi, Swf, True)        #Plot Kr curves
+            fig_canvas_agg_fw = plots.plot_fw(window, fig_canvas_agg_fw, fig_fw, ax2, Sw2, fw, Swi, Swf, True)              #Plot fw curve
+            fig_canvas_agg_np = plots.plot_np(window, fig_canvas_agg_np, fig_np, ax3, Qi, Avg_Sw, Swm_calc, True)           #Plot fw curve
+            fig_canvas_agg_dp = plots.plot_dp(window, fig_canvas_agg_dp, fig_dp, ax4, Qi, lambda2, True)                    #Plot lambda2 curve  
+            gui.populate_results(window, Swi, Sor, krw_Sor, ko_Swi, degree)
+            gui.populate_kr_table(window, kr_table, Sw2, kro, krw, fw)
+            
+    if event == "Clear":                                            # Clear Button pressed
+        fig_canvas_agg_kr = plots.plot_kr(window, fig_canvas_agg_kr, fig_kr, ax1, Sw2, kro_fit, krw_fit, Swi, Swf, False)     #Clear all plots
+        fig_canvas_agg_fw = plots.plot_fw(window, fig_canvas_agg_fw, fig_fw, ax2, Sw2, fw, Swi, Swf, False)                   #Clear all plots
+        fig_canvas_agg_np = plots.plot_np(window, fig_canvas_agg_np, fig_np, ax3, Qi, Avg_Sw, Swm_calc, False)                #Clear all plots
+        fig_canvas_agg_dp = plots.plot_dp(window, fig_canvas_agg_dp, fig_dp, ax4, Qi, lambda2, False)                         #Clear all plots
+        gui.clear_results(window, degree)
+        gui.clear_kr_table(window, kr_table)
+    
+    if event == "Save Results":                                     # Save Results Button pressed
+        if Sor==0 or krw_Sor==0 or not path.isfile(data_file):      # Check if there are results to be saved or if the data file exists (it's needed to get original values)
+            gui.input_error('No results to save or data file is non existent')
+        else:                                                       # if there are results and data file, the open the save dialog window
+            window_save = gui.save_window(report_file, report_folder)
+            while True:
+                event_save, values_save = window_save.read()
+                if event_save == "Cancel" or event_save == sg.WIN_CLOSED:
+                    report_folder = values_save['-FOLDER-']
+                    window_save.close()
+                    break
+                if event_save == "Save":                            # If Save is pressed, get original values from data_file             
+                    Wiexp, Npexp, deltaPexp, Use = Wio, Npo, dPo, Use = jr.get_data_table (data_file)
+                    report_folder = values_save['-FOLDER-']  
+                    report_path = report_folder + '/' + values_save['-FILE-'] + '.xls'    # Format the complete report file PATH
+                    if gui.file_exists_check(report_path):                      # If file does not exists, then save
+                        print('Saving to ', report_path)
+                        jrsave.save_to_file(report_path, Swi, L, D, Vp, uo, uw, q, ko_Swi, Sor, Swf, krw_Sor, Wi, Np, deltaP, Sw2, kro, krw, Wiexp, Npexp, deltaPexp, degree)     
+                        window_save.close()
+                        break
+                    else:
+                        print('File exists or already open...')
 window.close()
 
-
-
-# #--- WRITE TO EXCEL FILE ---
-# writer = pd.ExcelWriter("test_KR.xlsx",engine="xlsxwriter" )
-# workbook = writer.book
-# worksheet = workbook.add_worksheet('KR')
-# writer.sheets['KR'] = worksheet
-# sat_format = workbook.add_format()
-# sat_format.set_num_format('0.0')
-# kr_format = workbook.add_format()
-# kr_format.set_num_format('0.000')
-# worksheet.write('A1','--TEST DATA--')
-# worksheet.write('A2','Swi[%]')
-# worksheet.write('B2', Swi, sat_format)
-# worksheet.write('A3','VP[cm3]')
-# worksheet.write('B3',Vp)
-# worksheet.write('A4','uo[cP]')
-# worksheet.write('B4',uo)
-# worksheet.write('A4','uw[cP]')
-# worksheet.write('B4',uw)
-# worksheet.write('A4','q[cm3/h]')
-# worksheet.write('B4',q)
-# worksheet.write('A5','--RESULTS--')
-# worksheet.write('A6','Sor[%]')
-# worksheet.write('B6', Sor ,sat_format)
-# worksheet.write('A7','Swf[%]')
-# worksheet.write('B7', Swf, sat_format)
-# worksheet.write('A8','Krw@Sor')
-# worksheet.write('B8', krw_Sor, kr_format)
-
-# df.to_excel(writer, sheet_name='KR', startrow=10, startcol=0)
-
-# worksheet = writer.book.add_worksheet('KR LET')
-# writer.sheets['KR LET'] = worksheet
-# worksheet.write(0,0,"LET RELATIVE PERMEABILITY TABLE")
-# df_let.to_excel(writer, sheet_name='KR LET', startrow=4, startcol=0)
-# writer.save()  
-  
